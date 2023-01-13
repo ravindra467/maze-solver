@@ -1,7 +1,11 @@
+import os
 import cv2 as cv
 import numpy as np
 import colorsys
 import threading
+from tkinter import filedialog
+from tkinter import Tk
+import tkinter.messagebox
 
 class Point(object):
     def __init__(self, x = 0, y = 0):
@@ -121,116 +125,81 @@ def sorter(queue, en):
     index = reversed(index)
     return ([x for _, x in sorted(zip(index, queue))])
 
-def dfs(st, en):
-    global col, h, w, directions
-    col_const = 200
-    count = 0
 
-    found = False
-    queue = []
-    visited = [[0 for j in range(w)]for i in range(h)]
-    parent = [[Point() for j in range(w)]for i in range(h)]
+root = Tk()
+root.withdraw()
 
-    queue.append(st)
-    visited[st.y][st.x] = 1
+response = tkinter.messagebox.askquestion("Upload Image", "Please upload an image of CLOSED MAZE in .jpg or .jpeg or .png format only OR To use default image click on 'No' ")
 
-    while len(queue) > 0:
-        parent_point = queue.pop() # use this for dfs
-        count +=1
+if response=='yes':
+
+    file_path = filedialog.askopenfilename()
+    _, file_extension = os.path.splitext(file_path)
+
+    supported_formats = ['.jpg', '.jpeg', '.png']
 
 
-        if count%100 == 0:
-            display_image = col.copy()
-            display_image = cv.resize(display_image, (800, 800))
-            cv.imshow('image', display_image)
-            cv.waitKey(1)
+    try:
+        # Open the image file using the file path
+        if file_extension.lower() not in supported_formats:
+            raise ValueError(f"Error: unsupported file format {file_extension}, supported formats are .jpg and .jpeg and .png")
 
-        for direction in directions:
+        point_count = 0
+        start  = Point()
+        end = Point()
+        directions = [Point(0, -1), Point(0, 1), Point(1, 0), Point(-1, 0)]
+        size = 512
+        img = cv.imread(file_path, 0)
+        img = cv.resize(img, (size, size))
+        ret, thresh = cv.threshold(img, 150, 255, cv.THRESH_BINARY_INV)
+        thresh = cv.resize(thresh, (size, size))
+        col = cv.cvtColor(thresh, cv.COLOR_GRAY2BGR)
+        h, w, d = col.shape
 
-            daughter_cell = parent_point + direction
-            x = daughter_cell.x
-            y = daughter_cell.y
-            if daughter_cell.x>0 and daughter_cell.y>0 and daughter_cell.y<h and daughter_cell.x<w:
-                caching_queue = []
-                if visited[daughter_cell.y][daughter_cell.x] == 0 and (col[daughter_cell.y][daughter_cell.x][0] != 255 or
-                    col[daughter_cell.y][daughter_cell.x][1] != 255 or
-                    col[daughter_cell.y][daughter_cell.x][2] != 255):
+        cv.namedWindow('image')
+        cv.setMouseCallback('image', onMouse)
+        while True:
+            cv.imshow('image', col)
+            k = cv.waitKey(100)
+            if point_count == 2:
+                break
+        pass
 
-                    caching_queue.append(daughter_cell)
-                    pass
-                print([f"{p.x}, {p.y}" for p in caching_queue])
-                caching_queue = sorter(caching_queue, en)
-                print([f"{p.x}, {p.y}" for p in caching_queue])
-                for cell in caching_queue:
-                    queue.append(cell)
+        # now we have the start and end points
+        bfs(start, end)
+        cv.destroyAllWindows()
+    except ValueError as e:
+        tkinter.messagebox.showerror("Error", e)
+    except FileNotFoundError as e:
+        tkinter.messagebox.showerror("Error", "File not Found")
 
-                    visited[y][x] = visited[parent_point.y][parent_point.x] + 1
+else:
+    file_path = '12345.jpg'
+    try:
+        point_count = 0
+        start  = Point()
+        end = Point()
+        directions = [Point(0, -1), Point(0, 1), Point(1, 0), Point(-1, 0)]
+        size = 512
+        img = cv.imread(file_path, 0)
+        img = cv.resize(img, (size, size))
+        ret, thresh = cv.threshold(img, 150, 255, cv.THRESH_BINARY_INV)
+        thresh = cv.resize(thresh, (size, size))
+        col = cv.cvtColor(thresh, cv.COLOR_GRAY2BGR)
+        h, w, d = col.shape
 
-                    col[y][x] = list(reversed([255 * i for i in
-                        colorsys.hsv_to_rgb(
-                            visited[y][x] / col_const, 100, 100)]))
-                    parent[y][x] = parent_point
+        cv.namedWindow('image')
+        cv.setMouseCallback('image', onMouse)
+        while True:
+            cv.imshow('image', col)
+            k = cv.waitKey(100)
+            if point_count == 2:
+                break
+        pass
 
-                    if daughter_cell == en:
-                        print('end')
-                        found = True
-                        del queue[:]
-    path = []
-    c = 0
-    if found:
-        point = en
-        while point!=st:
-            path.append(point)
-            point = parent[point.y][point.x]
-        path.append(point)
-        for p in path:
-            cv.rectangle(col, (p.x-1, p.y-1), (p.x+1, p.y+1), (0, 255, 255, 100), -1)
+        # now we have the start and end points
+        bfs(start, end)
+        cv.destroyAllWindows()
 
-
-            if(c % 15 == 0):
-                display_image = col.copy()
-                display_image = cv.resize(display_image, (800, 800))
-                cv.imshow('image', display_image)
-                cv.waitKey(1)
-            c+=1
-        print('found')
-        display_image = col.copy()
-        display_image = cv.resize(display_image, (800, 800))
-        cv.imshow('image', display_image)
-        cv.waitKey(0)
-
-    else:
-        print('not found')
-
-
-point_count = 0
-start  = Point()
-end = Point()
-
-directions = [Point(0, -1), Point(0, 1), Point(1, 0), Point(-1, 0)]
-size = 512
-img = cv.imread('12345.jpg', 0)
-img = cv.resize(img, (size, size))
-ret, thresh = cv.threshold(img, 150, 255, cv.THRESH_BINARY_INV)
-thresh = cv.resize(thresh, (size, size))
-col = cv.cvtColor(thresh, cv.COLOR_GRAY2BGR)
-h, w, d = col.shape
-
-cv.namedWindow('image')
-cv.setMouseCallback('image', onMouse)
-while True:
-    cv.imshow('original', img)
-    cv.imshow('image', col)
-    cv.imshow('thresh', thresh)
-    # cv.imshow('difference', diff)
-    k = cv.waitKey(100)
-    if point_count == 2:
-        break
-pass
-
-
-# now we have the start and end points
-bfs(start, end)
-
-
-cv.destroyAllWindows()
+    except FileNotFoundError as e:
+        tkinter.messagebox.showerror("Error", "Default image not found.")
